@@ -1,13 +1,18 @@
 import telebot
 from telebot import types
+from flask import Flask, request
+import os
 
 bot = telebot.TeleBot('8444015997:AAG5fJECvwVJqbZmaehxr813VGFjWT9rvOA')
+app = Flask(__name__)
 
 # ЗАМЕНИТЕ НА ВАШ TELEGRAM ID
-YOUR_TELEGRAM_ID = -5050212207
+YOUR_TELEGRAM_ID = -1003890372662
 
 user_data = {}
 
+
+# ========== ВСЕ ТВОИ СТАРЫЕ ФУНКЦИИ ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ ==========
 
 # СТАРТ
 @bot.message_handler(commands=['start'])
@@ -19,7 +24,7 @@ def send_welcome(message):
                      reply_markup=knopka)
 
 
-# ГОРОД ОТПРАВЛЕНИЯ - 0 (НОВЫЙ БЛОК)
+# ГОРОД ОТПРАВЛЕНИЯ - 0
 @bot.callback_query_handler(func=lambda call: call.data == 'form')
 def callback_departure_city(call):
     knopka = types.InlineKeyboardMarkup()
@@ -185,7 +190,6 @@ def get_budget(message):
 
         data = user_data[message.chat.id]
 
-        # Показываем пользователю всё, что он ввел, и просим подтверждения
         confirm_text = (f"📝 **Проверьте правильность введенных данных:**\n\n"
                         f"🏙️ **Город отправления:** {data['city']}\n"
                         f"🌍 **Страна:** {data['country']}\n"
@@ -198,7 +202,6 @@ def get_budget(message):
                         f"💰 **Бюджет до:** {data['budget']} руб.\n\n"
                         f"✅ **Всё верно?**")
 
-        # Кнопки в ряд (две колонки)
         confirm_knopka = types.InlineKeyboardMarkup(row_width=2)
         confirm_knopka.add(
             types.InlineKeyboardButton('✅ Да, всё верно', callback_data='confirm_yes'),
@@ -217,7 +220,6 @@ def get_budget(message):
 def confirm_yes(call):
     bot.answer_callback_query(call.id)
 
-    # Удаляем сообщение с подтверждением (отправляем новое вместо него)
     bot.delete_message(call.message.chat.id, call.message.message_id)
 
     data = user_data[call.message.chat.id]
@@ -225,7 +227,6 @@ def confirm_yes(call):
     new_order_knopka = types.InlineKeyboardMarkup()
     new_order_knopka.add(types.InlineKeyboardButton('🔄 Подать новую заявку', callback_data='new_order'))
 
-    # Финальная сводка для пользователя
     summary = (f"✅ Ваша заявка принята!\n\n"
                f"🏙️ Город отправления: {data['city']}\n"
                f"🌍 Страна: {data['country']}\n"
@@ -239,7 +240,6 @@ def confirm_yes(call):
                f"✨ С вами свяжутся в течение получаса.")
     bot.send_message(call.message.chat.id, summary, reply_markup=new_order_knopka)
 
-    # Отправка заявки турагенту
     client_name = call.from_user.first_name or call.from_user.username or "Клиент"
     client_username = f"@{call.from_user.username}" if call.from_user.username else "нет username"
 
@@ -266,19 +266,16 @@ def confirm_yes(call):
     del user_data[call.message.chat.id]
 
 
-# ПОДТВЕРЖДЕНИЕ - НЕТ (начать заново)
+# ПОДТВЕРЖДЕНИЕ - НЕТ
 @bot.callback_query_handler(func=lambda call: call.data == 'confirm_no')
 def confirm_no(call):
     bot.answer_callback_query(call.id)
 
-    # Удаляем сообщение с подтверждением
     bot.delete_message(call.message.chat.id, call.message.message_id)
 
-    # Очищаем данные пользователя
     if call.message.chat.id in user_data:
         del user_data[call.message.chat.id]
 
-    # Начинаем заново с вопроса про город отправления
     knopka = types.InlineKeyboardMarkup()
     knopka.add(types.InlineKeyboardButton('Москва', callback_data='city_Москва'))
     knopka.add(types.InlineKeyboardButton('Санкт-Петербург', callback_data='city_Санкт-Петербург'))
@@ -297,4 +294,40 @@ def new_order(call):
     send_welcome(call.message)
 
 
-bot.polling(none_stop=True)
+# ========== НОВЫЙ КОД ДЛЯ ВЕБХУКОВ (ВМЕСТО polling) ==========
+
+# Устанавливаем вебхук при запуске
+def set_webhook():
+    webhook_url = os.environ.get('RENDER_EXTERNAL_URL')  # Render сам подставит URL
+    if webhook_url:
+        webhook_url = f"{webhook_url}/webhook"
+        bot.remove_webhook()
+        bot.set_webhook(url=webhook_url)
+        print(f"Вебхук установлен: {webhook_url}")
+    else:
+        print("RENDER_EXTERNAL_URL не найден, проверьте настройки Render")
+
+
+# Обработка входящих запросов от Telegram
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return 'OK', 200
+    else:
+        return 'Bad request', 400
+
+
+# Проверка здоровья (чтобы Render не ругался)
+@app.route('/health')
+def health():
+    return 'OK', 200
+
+
+# Запуск Flask-приложения (Render сам задаст порт через переменную PORT)
+if __name__ == '__main__':
+    set_webhook()
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
