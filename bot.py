@@ -7,7 +7,7 @@ bot = telebot.TeleBot('8444015997:AAG5fJECvwVJqbZmaehxr813VGFjWT9rvOA')
 app = Flask(__name__)
 
 # ЗАМЕНИТЕ НА ВАШ TELEGRAM ID
-YOUR_TELEGRAM_ID = -1003890372662
+YOUR_TELEGRAM_ID = -5050212207
 
 user_data = {}
 
