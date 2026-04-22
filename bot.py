@@ -241,7 +241,8 @@ def confirm_yes(call):
                      f"✅ Чтобы ответить клиенту, напишите ему: @{call.from_user.username if call.from_user.username else 'username отсутствует'}")
 
     try:
-        bot.send_message(YOUR_TELEGRAM_ID, agent_summary, parse_mode='Markdown')
+        # ⬇️ ЭТО ЕДИНСТВЕННОЕ ИЗМЕНЕНИЕ - убрал parse_mode='Markdown'
+        bot.send_message(YOUR_TELEGRAM_ID, agent_summary)
         bot.send_message(call.message.chat.id, "📨 Заявка отправлена турагенту!")
     except:
         bot.send_message(call.message.chat.id, "⚠️ Заявка сохранена, оператор свяжется с вами.")
