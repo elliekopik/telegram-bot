@@ -10,7 +10,8 @@ app = Flask(__name__)
 YOUR_TELEGRAM_ID = -5050212207
 
 user_data = {}
-user_step = {}  # Храним текущий шаг пользователя
+
+# ========== ВСЕ ФУНКЦИИ ==========
 
 # СТАРТ
 @bot.message_handler(commands=['start'])
@@ -20,77 +21,20 @@ def send_welcome(message):
     bot.send_message(message.chat.id, "Вас приветствует бот-турагент НиЭль-Тур!🌴 С ним вы сможете подобрать самый комфортный тур по вашим критериям.",
                      reply_markup=knopka)
 
-# Проверка, не пытается ли пользователь нажать на старую кнопку
-def check_step(call, expected_step, step_name):
-    current_step = user_step.get(call.message.chat.id, None)
-    if current_step != expected_step:
-        bot.answer_callback_query(call.id)
-        knopka = types.InlineKeyboardMarkup()
-        knopka.add(types.InlineKeyboardButton('✅ Продолжить', callback_data='continue_filling'))
-        knopka.add(types.InlineKeyboardButton('🔄 Заполнить заново', callback_data='restart_filling'))
-        bot.send_message(call.message.chat.id, 
-                         "❓ Вы нажали на кнопку из старого сообщения.\nПродолжим заполнение анкеты?",
-                         reply_markup=knopka)
-        return False
-    return True
-
-# Обработчик "Продолжить"
-@bot.callback_query_handler(func=lambda call: call.data == 'continue_filling')
-def continue_filling(call):
-    bot.answer_callback_query(call.id)
-    chat_id = call.message.chat.id
-    step = user_step.get(chat_id, 'city')
-    
-    if step == 'city':
-        show_country_menu(call.message)
-    elif step == 'date':
-        bot.send_message(chat_id, 'Введите примерную дату вылета.')
-        bot.register_next_step_handler(call.message, get_date)
-    elif step == 'nights':
-        bot.send_message(chat_id, 'Укажите примерное количество ночей.')
-        bot.register_next_step_handler(call.message, get_nights)
-    elif step == 'stars':
-        ask_stars(call.message)
-    elif step == 'adults':
-        knopka = types.InlineKeyboardMarkup()
-        for i in range(1, 5):
-            knopka.add(types.InlineKeyboardButton(f'{i} взрослых', callback_data=f'adults_{i}'))
-        bot.send_message(chat_id, 'Пожалуйста, выберите количество взрослых.', reply_markup=knopka)
-    elif step == 'kids':
-        knopka = types.InlineKeyboardMarkup()
-        for i in range(0, 5):
-            knopka.add(types.InlineKeyboardButton(f'{i} детей', callback_data=f'kids_{i}'))
-        bot.send_message(chat_id, 'Выберите количество детей (Если без детей — ставьте 0).', reply_markup=knopka)
-    elif step == 'budget':
-        bot.send_message(chat_id, 'Примерный бюджет (в рублях).')
-        bot.register_next_step_handler(call.message, get_budget)
-
-# Обработчик "Заполнить заново"
-@bot.callback_query_handler(func=lambda call: call.data == 'restart_filling')
-def restart_filling(call):
-    bot.answer_callback_query(call.id)
-    if call.message.chat.id in user_data:
-        del user_data[call.message.chat.id]
-    if call.message.chat.id in user_step:
-        del user_step[call.message.chat.id]
-    send_welcome(call.message)
-
-# ГОРОД ОТПРАВЛЕНИЯ
+# ГОРОД ОТПРАВЛЕНИЯ - 0
 @bot.callback_query_handler(func=lambda call: call.data == 'form')
 def callback_departure_city(call):
     knopka = types.InlineKeyboardMarkup()
     knopka.add(types.InlineKeyboardButton('Москва', callback_data='city_Москва'))
-    knopka.add(types.InlineKeyboardButton('Санкт-Петербург', callback_data='city_Санкт-Петербург'))
+    knopka.add(types.InlineKeyboardButton('Санкт-Петербург', callback_data='city_Санкт-ПетерБург'))
     knopka.add(types.InlineKeyboardButton('Екатеринбург', callback_data='city_Екатеринбург'))
     knopka.add(types.InlineKeyboardButton('Новосибирск', callback_data='city_Новосибирск'))
     knopka.add(types.InlineKeyboardButton('Другой', callback_data='city_Другой'))
     bot.send_message(call.message.chat.id, 'Выберите город отправления.', reply_markup=knopka)
 
+# ОБРАБОТКА ВЫБОРА ГОРОДА
 @bot.callback_query_handler(func=lambda call: call.data.startswith('city_'))
 def callback_country_start(call):
-    if not check_step(call, 'city', 'city'):
-        return
-    
     city = call.data.split('_')[1]
     
     if city == 'Другой':
@@ -99,32 +43,37 @@ def callback_country_start(call):
         bot.register_next_step_handler(call.message, get_custom_city)
     else:
         user_data[call.message.chat.id] = {'city': city}
-        user_step[call.message.chat.id] = 'country'
         bot.answer_callback_query(call.id)
         show_country_menu(call.message)
 
 def get_custom_city(message):
     city = message.text
     user_data[message.chat.id] = {'city': city}
-    user_step[message.chat.id] = 'country'
     bot.send_message(message.chat.id, f'Город отправления: {city}')
     show_country_menu(message)
 
 def show_country_menu(message):
     knopka = types.InlineKeyboardMarkup(row_width=2)
-    countries = ['Армения 🇦🇲', 'Вьетнам 🇻🇳', 'Грузия 🇬🇪', 'Египет 🇪🇬', 
-                 'Индонезия(Бали) 🇮🇩', 'Китай 🇨🇳', 'Мальдивы 🇲🇻', 'ОАЭ 🇦🇪', 
-                 'Россия 🇷🇺', 'Сейшелы 🇸🇨', 'Таиланд 🇹🇭', 'Турция 🇹🇷', 
-                 'Узбекистан 🇺🇿', 'Шри-Ланка 🇱🇰', 'Другая']
-    for country in countries:
-        knopka.add(types.InlineKeyboardButton(country, callback_data=f'country_{country}'))
+    knopka.add(types.InlineKeyboardButton('Армения 🇦🇲', callback_data='country_Армения'))
+    knopka.add(types.InlineKeyboardButton('Вьетнам 🇻🇳', callback_data='country_Вьетнам'))
+    knopka.add(types.InlineKeyboardButton('Грузия 🇬🇪', callback_data='country_Грузия'))
+    knopka.add(types.InlineKeyboardButton('Египет 🇪🇬', callback_data='country_Египет'))
+    knopka.add(types.InlineKeyboardButton('Индонезия(Бали) 🇮🇩', callback_data='country_Индонезия(Бали)'))
+    knopka.add(types.InlineKeyboardButton('Китай 🇨🇳', callback_data='country_Китай'))
+    knopka.add(types.InlineKeyboardButton('Мальдивы 🇲🇻', callback_data='country_Мальдивы'))
+    knopka.add(types.InlineKeyboardButton('ОАЭ 🇦🇪', callback_data='country_ОАЭ'))
+    knopka.add(types.InlineKeyboardButton('Россия 🇷🇺', callback_data='country_Россия'))
+    knopka.add(types.InlineKeyboardButton('Сейшелы 🇸🇨', callback_data='country_Сейшелы'))
+    knopka.add(types.InlineKeyboardButton('Таиланд 🇹🇭', callback_data='country_Таиланд'))
+    knopka.add(types.InlineKeyboardButton('Турция 🇹🇷', callback_data='country_Турция'))
+    knopka.add(types.InlineKeyboardButton('Узбекистан 🇺🇿', callback_data='country_Узбекистан'))
+    knopka.add(types.InlineKeyboardButton('Шри-Ланка 🇱🇰', callback_data='country_Шри-Ланка'))
+    knopka.add(types.InlineKeyboardButton('Другая', callback_data='country_Другая'))
     bot.send_message(message.chat.id, 'Пожалуйста, выберите страну направления.', reply_markup=knopka)
 
+# СТРАНА
 @bot.callback_query_handler(func=lambda call: call.data.startswith('country_'))
-def callback_date_start(call):
-    if not check_step(call, 'country', 'country'):
-        return
-    
+def callback_date(call):
     country = call.data.split('_')[1]
 
     if country == 'Другая':
@@ -133,7 +82,6 @@ def callback_date_start(call):
         bot.register_next_step_handler(call.message, get_custom_country)
     else:
         user_data[call.message.chat.id]['country'] = country
-        user_step[call.message.chat.id] = 'date'
         bot.answer_callback_query(call.id)
         bot.send_message(call.message.chat.id, 'Введите примерную дату вылета.')
         bot.register_next_step_handler(call.message, get_date)
@@ -141,7 +89,6 @@ def callback_date_start(call):
 def get_custom_country(message):
     custom_country = message.text
     user_data[message.chat.id]['country'] = custom_country
-    user_step[message.chat.id] = 'date'
     bot.send_message(message.chat.id, f'Страна: {custom_country}')
     bot.send_message(message.chat.id, 'Введите примерную дату вылета')
     bot.register_next_step_handler(message, get_date)
@@ -149,22 +96,22 @@ def get_custom_country(message):
 def get_date(message):
     date = message.text
     user_data[message.chat.id]['date'] = date
-    user_step[message.chat.id] = 'nights'
     bot.send_message(message.chat.id, f'Примерная дата вылета: {date}')
     bot.send_message(message.chat.id, 'Укажите примерное количество ночей.')
     bot.register_next_step_handler(message, get_nights)
 
+# КОЛИЧЕСТВО НОЧЕЙ
 def get_nights(message):
     try:
         nights = int(message.text)
         user_data[message.chat.id]['nights'] = nights
-        user_step[message.chat.id] = 'stars'
         bot.send_message(message.chat.id, f'Количество ночей: {nights}')
         ask_stars(message)
     except:
         bot.send_message(message.chat.id, 'Пожалуйста, введите число.')
         bot.register_next_step_handler(message, get_nights)
 
+# ЗВЕЗДЫ ОТЕЛЯ
 def ask_stars(message):
     knopka = types.InlineKeyboardMarkup()
     for i in range(3, 6):
@@ -173,26 +120,19 @@ def ask_stars(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('stars_'))
 def callback_adult(call):
-    if not check_step(call, 'stars', 'stars'):
-        return
-    
     stars = call.data.split('_')[1]
     user_data[call.message.chat.id]['stars'] = stars
-    user_step[call.message.chat.id] = 'adults'
     bot.answer_callback_query(call.id)
     knopka = types.InlineKeyboardMarkup()
     for i in range(1, 5):
         knopka.add(types.InlineKeyboardButton(f'{i} взрослых', callback_data=f'adults_{i}'))
     bot.send_message(call.message.chat.id, 'Пожалуйста, выберите количество взрослых.', reply_markup=knopka)
 
+# ВЗРОСЛЫЕ
 @bot.callback_query_handler(func=lambda call: call.data.startswith('adults_'))
 def callback_kids(call):
-    if not check_step(call, 'adults', 'adults'):
-        return
-    
     adults = call.data.split('_')[1]
     user_data[call.message.chat.id]['adults'] = adults
-    user_step[call.message.chat.id] = 'kids'
     bot.answer_callback_query(call.id)
     knopka = types.InlineKeyboardMarkup()
     for i in range(0, 5):
@@ -200,28 +140,23 @@ def callback_kids(call):
     bot.send_message(call.message.chat.id, 'Выберите количество детей (Если без детей — ставьте 0).',
                      reply_markup=knopka)
 
+# ДЕТИ КОЛИЧЕСТВО
 @bot.callback_query_handler(func=lambda call: call.data.startswith('kids_'))
 def callback_kidsage(call):
-    if not check_step(call, 'kids', 'kids'):
-        return
-    
     kids_count = call.data.split('_')[1]
     user_data[call.message.chat.id]['kids_count'] = kids_count
     bot.answer_callback_query(call.id)
-    
     if kids_count == '0':
-        user_step[call.message.chat.id] = 'budget'
         ask_budget(call.message)
     else:
-        user_step[call.message.chat.id] = 'kids_age'
         bot.send_message(call.message.chat.id,
                          'Введите возраст ребенка (Если несколько детей, запишите через запятую.)')
         bot.register_next_step_handler(call.message, get_kids_age)
 
+# ВОЗРАСТ ДЕТЕЙ
 def get_kids_age(message):
     kids_age = message.text
     user_data[message.chat.id]['kids_age'] = kids_age
-    user_step[message.chat.id] = 'budget'
     bot.send_message(message.chat.id, f'Возраст детей: {kids_age}')
     ask_budget(message)
 
@@ -229,11 +164,11 @@ def ask_budget(message):
     bot.send_message(message.chat.id, 'Примерный бюджет (в рублях).')
     bot.register_next_step_handler(message, get_budget)
 
+# БЮДЖЕТ
 def get_budget(message):
     try:
         budget = int(message.text)
         user_data[message.chat.id]['budget'] = budget
-        user_step[message.chat.id] = 'confirm'
         bot.send_message(message.chat.id, f'Бюджет до: {budget} руб.')
 
         data = user_data[message.chat.id]
@@ -256,11 +191,13 @@ def get_budget(message):
             types.InlineKeyboardButton('❌ Нет, изменить', callback_data='confirm_no')
         )
 
-        bot.send_message(message.chat.id, confirm_text, reply_markup=confirm_knopka, parse_mode='Markdown')
+        bot.send_message(message.chat.id, confirm_text, reply_markup=confirm_knopka)
+
     except:
         bot.send_message(message.chat.id, 'Пожалуйста, введите число')
         bot.register_next_step_handler(message, get_budget)
 
+# ПОДТВЕРЖДЕНИЕ - ДА
 @bot.callback_query_handler(func=lambda call: call.data == 'confirm_yes')
 def confirm_yes(call):
     bot.answer_callback_query(call.id)
@@ -308,8 +245,8 @@ def confirm_yes(call):
         bot.send_message(call.message.chat.id, "⚠️ Заявка сохранена, оператор свяжется с вами.")
 
     del user_data[call.message.chat.id]
-    del user_step[call.message.chat.id]
 
+# ПОДТВЕРЖДЕНИЕ - НЕТ
 @bot.callback_query_handler(func=lambda call: call.data == 'confirm_no')
 def confirm_no(call):
     bot.answer_callback_query(call.id)
@@ -317,8 +254,6 @@ def confirm_no(call):
     
     if call.message.chat.id in user_data:
         del user_data[call.message.chat.id]
-    if call.message.chat.id in user_step:
-        del user_step[call.message.chat.id]
     
     knopka = types.InlineKeyboardMarkup()
     knopka.add(types.InlineKeyboardButton('Москва', callback_data='city_Москва'))
@@ -328,13 +263,12 @@ def confirm_no(call):
     knopka.add(types.InlineKeyboardButton('Другой', callback_data='city_Другой'))
     bot.send_message(call.message.chat.id, 'Выберите город отправления.', reply_markup=knopka)
 
+# ОБРАБОТЧИК КНОПКИ "Подать новую заявку"
 @bot.callback_query_handler(func=lambda call: call.data == 'new_order')
 def new_order(call):
     bot.answer_callback_query(call.id)
     if call.message.chat.id in user_data:
         del user_data[call.message.chat.id]
-    if call.message.chat.id in user_step:
-        del user_step[call.message.chat.id]
     send_welcome(call.message)
 
 # ========== КОД ДЛЯ ВЕБХУКОВ ==========
