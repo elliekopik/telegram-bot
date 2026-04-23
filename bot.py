@@ -112,13 +112,14 @@ def get_nights(message):
         bot.send_message(message.chat.id, 'Пожалуйста, введите число.')
         bot.register_next_step_handler(message, get_nights)
 
+# ⭐ ЗВЕЗДЫ ОТЕЛЯ - 4 (ИЗМЕНЕНО - ДОБАВЛЕНО "от")
 def ask_stars(message):
     knopka = types.InlineKeyboardMarkup()
     for i in range(3, 6):
-        knopka.add(types.InlineKeyboardButton(f'{i} звезд', callback_data=f'stars_{i}'))
-    bot.send_message(message.chat.id, 'Пожалуйста, выберите количество звёзд в отеле.', reply_markup=knopka)
+        knopka.add(types.InlineKeyboardButton(f'от {i} звезд', callback_data=f'stars_{i}'))
+    bot.send_message(message.chat.id, 'Пожалуйста, выберите категорию звёздности отеля.', reply_markup=knopka)
 
-# ЗВЕЗДЫ - 4
+# ЗВЕЗДЫ - 4 (обработчик)
 @bot.callback_query_handler(func=lambda call: call.data.startswith('stars_'))
 def callback_adult(call):
     stars = call.data.split('_')[1]
@@ -179,7 +180,7 @@ def get_budget(message):
                         f"🌍 **Страна:** {data['country']}\n"
                         f"📅 **Дата вылета:** {data['date']}\n"
                         f"🌙 **Ночей:** {data['nights']}\n"
-                        f"⭐ **Звезд:** {data['stars']}\n"
+                        f"⭐ **Звезд:** от {data['stars']}\n"
                         f"👨‍👩 **Взрослых:** {data['adults']}\n"
                         f"👶 **Детей:** {data.get('kids_count', '0')}\n"
                         f"🧩 **Возраст детей:** {data.get('kids_age', '-')}\n"
@@ -215,7 +216,7 @@ def confirm_yes(call):
                f"🌍 Страна: {data['country']}\n"
                f"📅 Дата вылета: {data['date']}\n"
                f"🌙 Ночей: {data['nights']}\n"
-               f"⭐ Звезд: {data['stars']}\n"
+               f"⭐ Звезд: от {data['stars']}\n"
                f"👨‍👩 Взрослых: {data['adults']}\n"
                f"👶 Детей: {data.get('kids_count', '0')}\n"
                f"🧩 Возраст детей: {data.get('kids_age', '-')}\n"
@@ -233,7 +234,7 @@ def confirm_yes(call):
                      f"🌍 **Страна:** {data['country']}\n"
                      f"📅 **Дата вылета:** {data['date']}\n"
                      f"🌙 **Ночей:** {data['nights']}\n"
-                     f"⭐ **Звезд:** {data['stars']}\n"
+                     f"⭐ **Звезд:** от {data['stars']}\n"
                      f"👨‍👩 **Взрослых:** {data['adults']}\n"
                      f"👶 **Детей:** {data.get('kids_count', '0')}\n"
                      f"🧩 **Возраст детей:** {data.get('kids_age', '-')}\n"
