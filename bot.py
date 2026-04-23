@@ -13,10 +13,11 @@ user_data = {}
 user_step = {}
 waiting_for_decision = {}
 
-# СТАРТ
+# ========== ОСНОВНАЯ КОМАНДА СТАРТ (всегда работает) ==========
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
+    # Полная очистка всех данных пользователя
     if chat_id in user_data:
         del user_data[chat_id]
     if chat_id in user_step:
@@ -29,6 +30,7 @@ def send_welcome(message):
     bot.send_message(chat_id, "Вас приветствует бот-турагент НиЭль-Тур!🌴 С ним вы сможете подобрать самый комфортный тур по вашим критериям.",
                      reply_markup=knopka)
 
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def check_old_callback(call, expected_step):
     chat_id = call.message.chat.id
     current_step = user_step.get(chat_id, 'start')
@@ -45,6 +47,10 @@ def check_old_callback(call, expected_step):
         return False
     return True
 
+def is_waiting_for_decision(message):
+    return waiting_for_decision.get(message.chat.id, False)
+
+# ========== ОБРАБОТЧИКИ КНОПОК "ПРОДОЛЖИТЬ" И "ЗАНОВО" ==========
 @bot.callback_query_handler(func=lambda call: call.data == 'continue_filling')
 def continue_filling(call):
     bot.answer_callback_query(call.id)
@@ -101,9 +107,7 @@ def restart_filling(call):
         del user_step[chat_id]
     send_welcome(call.message)
 
-def is_waiting_for_decision(message):
-    return waiting_for_decision.get(message.chat.id, False)
-
+# ========== ОСНОВНЫЕ ШАГИ АНКЕТЫ ==========
 @bot.callback_query_handler(func=lambda call: call.data == 'form')
 def callback_departure_city(call):
     user_step[call.message.chat.id] = 'city'
@@ -133,16 +137,21 @@ def callback_country_start(call):
         show_country_menu(call.message)
 
 def get_custom_city(message):
+    # ПЕРВАЯ ПРОВЕРКА: команда /start
+    if message.text == '/start':
+        send_welcome(message)
+        return
+    
     if is_waiting_for_decision(message):
         bot.send_message(message.chat.id, "⚠️ Сначала выберите действие на вопрос выше: «Продолжить» или «Заполнить заново».")
         return
+    
     city = message.text
     user_data[message.chat.id] = {'city': city}
     user_step[message.chat.id] = 'country'
     bot.send_message(message.chat.id, f'Город отправления: {city}')
     show_country_menu(message)
 
-# ========== ЗДЕСЬ ГЛАВНОЕ ИЗМЕНЕНИЕ — row_width=2 ==========
 def show_country_menu(message):
     knopka = types.InlineKeyboardMarkup(row_width=2)
     knopka.add(types.InlineKeyboardButton('Армения 🇦🇲', callback_data='country_Армения'))
@@ -181,9 +190,14 @@ def callback_date_start(call):
         bot.register_next_step_handler(call.message, get_date)
 
 def get_custom_country(message):
+    if message.text == '/start':
+        send_welcome(message)
+        return
+    
     if is_waiting_for_decision(message):
         bot.send_message(message.chat.id, "⚠️ Сначала выберите действие на вопрос выше: «Продолжить» или «Заполнить заново».")
         return
+    
     custom_country = message.text
     user_data[message.chat.id]['country'] = custom_country
     user_step[message.chat.id] = 'date'
@@ -192,9 +206,14 @@ def get_custom_country(message):
     bot.register_next_step_handler(message, get_date)
 
 def get_date(message):
+    if message.text == '/start':
+        send_welcome(message)
+        return
+    
     if is_waiting_for_decision(message):
         bot.send_message(message.chat.id, "⚠️ Сначала выберите действие на вопрос выше: «Продолжить» или «Заполнить заново».")
         return
+    
     user_step[message.chat.id] = 'nights'
     date = message.text
     user_data[message.chat.id]['date'] = date
@@ -203,9 +222,14 @@ def get_date(message):
     bot.register_next_step_handler(message, get_nights)
 
 def get_nights(message):
+    if message.text == '/start':
+        send_welcome(message)
+        return
+    
     if is_waiting_for_decision(message):
         bot.send_message(message.chat.id, "⚠️ Сначала выберите действие на вопрос выше: «Продолжить» или «Заполнить заново».")
         return
+    
     try:
         nights = int(message.text)
         user_data[message.chat.id]['nights'] = nights
@@ -226,6 +250,7 @@ def ask_stars(message):
 def callback_adult(call):
     if not check_old_callback(call, 'stars'):
         return
+    
     stars = call.data.split('_')[1]
     user_data[call.message.chat.id]['stars'] = stars
     user_step[call.message.chat.id] = 'adults'
@@ -239,6 +264,7 @@ def callback_adult(call):
 def callback_kids(call):
     if not check_old_callback(call, 'adults'):
         return
+    
     adults = call.data.split('_')[1]
     user_data[call.message.chat.id]['adults'] = adults
     user_step[call.message.chat.id] = 'kids'
@@ -253,9 +279,11 @@ def callback_kids(call):
 def callback_kidsage(call):
     if not check_old_callback(call, 'kids'):
         return
+    
     kids_count = call.data.split('_')[1]
     user_data[call.message.chat.id]['kids_count'] = kids_count
     bot.answer_callback_query(call.id)
+    
     if kids_count == '0':
         user_step[call.message.chat.id] = 'budget'
         ask_budget(call.message)
@@ -266,9 +294,14 @@ def callback_kidsage(call):
         bot.register_next_step_handler(call.message, get_kids_age)
 
 def get_kids_age(message):
+    if message.text == '/start':
+        send_welcome(message)
+        return
+    
     if is_waiting_for_decision(message):
         bot.send_message(message.chat.id, "⚠️ Сначала выберите действие на вопрос выше: «Продолжить» или «Заполнить заново».")
         return
+    
     kids_age = message.text
     user_data[message.chat.id]['kids_age'] = kids_age
     user_step[message.chat.id] = 'budget'
@@ -280,15 +313,22 @@ def ask_budget(message):
     bot.register_next_step_handler(message, get_budget)
 
 def get_budget(message):
+    if message.text == '/start':
+        send_welcome(message)
+        return
+    
     if is_waiting_for_decision(message):
         bot.send_message(message.chat.id, "⚠️ Сначала выберите действие на вопрос выше: «Продолжить» или «Заполнить заново».")
         return
+    
     try:
         budget = int(message.text)
         user_data[message.chat.id]['budget'] = budget
         user_step[message.chat.id] = 'confirm'
         bot.send_message(message.chat.id, f'Бюджет до: {budget} руб.')
+        
         data = user_data[message.chat.id]
+
         confirm_text = (f"📝 Проверьте правильность введенных данных:\n\n"
                         f"🏙️ Город отправления: {data['city']}\n"
                         f"🌍 Страна: {data['country']}\n"
@@ -300,23 +340,30 @@ def get_budget(message):
                         f"🧩 Возраст детей: {data.get('kids_age', '-')}\n"
                         f"💰 Бюджет до: {data['budget']} руб.\n\n"
                         f"✅ Всё верно?")
+
         confirm_knopka = types.InlineKeyboardMarkup(row_width=2)
         confirm_knopka.add(
             types.InlineKeyboardButton('✅ Да, всё верно', callback_data='confirm_yes'),
             types.InlineKeyboardButton('❌ Нет, изменить', callback_data='confirm_no')
         )
+
         bot.send_message(message.chat.id, confirm_text, reply_markup=confirm_knopka)
+
     except:
         bot.send_message(message.chat.id, 'Пожалуйста, введите число')
         bot.register_next_step_handler(message, get_budget)
 
+# ========== ПОДТВЕРЖДЕНИЕ ==========
 @bot.callback_query_handler(func=lambda call: call.data == 'confirm_yes')
 def confirm_yes(call):
     bot.answer_callback_query(call.id)
     bot.delete_message(call.message.chat.id, call.message.message_id)
+    
     data = user_data[call.message.chat.id]
+
     new_order_knopka = types.InlineKeyboardMarkup()
     new_order_knopka.add(types.InlineKeyboardButton('🔄 Подать новую заявку', callback_data='new_order'))
+
     summary = (f"✅ Ваша заявка принята!\n\n"
                f"🏙️ Город отправления: {data['city']}\n"
                f"🌍 Страна: {data['country']}\n"
@@ -329,8 +376,10 @@ def confirm_yes(call):
                f"💰 Бюджет до: {data['budget']} руб.\n\n"
                f"✨ С вами свяжутся в течение получаса.")
     bot.send_message(call.message.chat.id, summary, reply_markup=new_order_knopka)
+
     client_name = call.from_user.first_name or call.from_user.username or "Клиент"
     client_username = f"@{call.from_user.username}" if call.from_user.username else "нет username"
+
     agent_summary = (f"📋 НОВАЯ ЗАЯВКА!\n\n"
                      f"👤 Клиент: {client_name}\n"
                      f"📱 Username: {client_username}\n"
@@ -344,11 +393,13 @@ def confirm_yes(call):
                      f"🧩 Возраст детей: {data.get('kids_age', '-')}\n"
                      f"💰 Бюджет до: {data['budget']} руб.\n\n"
                      f"✅ Чтобы ответить клиенту, напишите ему: @{call.from_user.username if call.from_user.username else 'username отсутствует'}")
+
     try:
         bot.send_message(YOUR_TELEGRAM_ID, agent_summary)
         bot.send_message(call.message.chat.id, "📨 Заявка отправлена турагенту!")
     except:
         bot.send_message(call.message.chat.id, "⚠️ Заявка сохранена, оператор свяжется с вами.")
+
     if call.message.chat.id in user_data:
         del user_data[call.message.chat.id]
     if call.message.chat.id in user_step:
@@ -358,12 +409,14 @@ def confirm_yes(call):
 def confirm_no(call):
     bot.answer_callback_query(call.id)
     bot.delete_message(call.message.chat.id, call.message.message_id)
+    
     if call.message.chat.id in user_data:
         del user_data[call.message.chat.id]
     if call.message.chat.id in user_step:
         del user_step[call.message.chat.id]
     if call.message.chat.id in waiting_for_decision:
         del waiting_for_decision[call.message.chat.id]
+    
     knopka = types.InlineKeyboardMarkup()
     knopka.add(types.InlineKeyboardButton('Москва', callback_data='city_Москва'))
     knopka.add(types.InlineKeyboardButton('Санкт-Петербург', callback_data='city_Санкт-Петербург'))
