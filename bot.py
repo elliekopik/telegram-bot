@@ -11,15 +11,14 @@ YOUR_TELEGRAM_ID = -5050212207
 
 user_data = {}
 
-# ========== ВСЕ ТВОИ СТАРЫЕ ФУНКЦИИ ==========
+# ========== ВСЕ ФУНКЦИИ ==========
 
 # СТАРТ
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     knopka = types.InlineKeyboardMarkup()
     knopka.add(types.InlineKeyboardButton('Заполнить форму 📝', callback_data='form'))
-    bot.send_message(message.chat.id, "Вас приветствует бот-турагент!🌴 "
-                                      "С ним вы сможете подобрать самый комфортный тур по вашим критериям.",
+    bot.send_message(message.chat.id, "Вас приветствует бот-турагент НиЭль-Тур!🌴 С ним вы сможете подобрать самый комфортный тур по вашим критериям.",
                      reply_markup=knopka)
 
 # ГОРОД ОТПРАВЛЕНИЯ - 0
@@ -112,14 +111,13 @@ def get_nights(message):
         bot.send_message(message.chat.id, 'Пожалуйста, введите число.')
         bot.register_next_step_handler(message, get_nights)
 
-# ⭐ ЗВЕЗДЫ ОТЕЛЯ - 4 (ИЗМЕНЕНО - ДОБАВЛЕНО "от")
+# ЗВЕЗДЫ ОТЕЛЯ - 4
 def ask_stars(message):
     knopka = types.InlineKeyboardMarkup()
     for i in range(3, 6):
         knopka.add(types.InlineKeyboardButton(f'от {i} звезд', callback_data=f'stars_{i}'))
     bot.send_message(message.chat.id, 'Пожалуйста, выберите категорию звёздности отеля.', reply_markup=knopka)
 
-# ЗВЕЗДЫ - 4 (обработчик)
 @bot.callback_query_handler(func=lambda call: call.data.startswith('stars_'))
 def callback_adult(call):
     stars = call.data.split('_')[1]
@@ -152,7 +150,7 @@ def callback_kidsage(call):
         ask_budget(call.message)
     else:
         bot.send_message(call.message.chat.id,
-                         'Введите возраст ребенка (Если несколько детей, запишите через запятую. Если без детей — поставьте 0)')
+                         'Введите возраст ребенка (Если несколько детей, запишите через запятую.)')
         bot.register_next_step_handler(call.message, get_kids_age)
 
 # ВОЗРАСТ ДЕТЕЙ - 7
@@ -227,18 +225,19 @@ def confirm_yes(call):
     client_name = call.from_user.first_name or call.from_user.username or "Клиент"
     client_username = f"@{call.from_user.username}" if call.from_user.username else "нет username"
 
-    agent_summary = (f"📋 **НОВАЯ ЗАЯВКА!**\n\n"
-                     f"👤 **Клиент:** {client_name}\n"
-                     f"📱 **Username:** {client_username}\n"
-                     f"🏙️ **Город отправления:** {data['city']}\n"
-                     f"🌍 **Страна:** {data['country']}\n"
-                     f"📅 **Дата вылета:** {data['date']}\n"
-                     f"🌙 **Ночей:** {data['nights']}\n"
-                     f"⭐ **Звезд:** от {data['stars']}\n"
-                     f"👨‍👩 **Взрослых:** {data['adults']}\n"
-                     f"👶 **Детей:** {data.get('kids_count', '0')}\n"
-                     f"🧩 **Возраст детей:** {data.get('kids_age', '-')}\n"
-                     f"💰 **Бюджет до:** {data['budget']} руб.\n\n"
+    # В анкете для турагента убрали звёздочки ** и Markdown
+    agent_summary = (f"📋 НОВАЯ ЗАЯВКА!\n\n"
+                     f"👤 Клиент: {client_name}\n"
+                     f"📱 Username: {client_username}\n"
+                     f"🏙️ Город отправления: {data['city']}\n"
+                     f"🌍 Страна: {data['country']}\n"
+                     f"📅 Дата вылета: {data['date']}\n"
+                     f"🌙 Ночей: {data['nights']}\n"
+                     f"⭐ Звезд: от {data['stars']}\n"
+                     f"👨‍👩 Взрослых: {data['adults']}\n"
+                     f"👶 Детей: {data.get('kids_count', '0')}\n"
+                     f"🧩 Возраст детей: {data.get('kids_age', '-')}\n"
+                     f"💰 Бюджет до: {data['budget']} руб.\n\n"
                      f"✅ Чтобы ответить клиенту, напишите ему: @{call.from_user.username if call.from_user.username else 'username отсутствует'}")
 
     try:
@@ -275,9 +274,8 @@ def new_order(call):
         del user_data[call.message.chat.id]
     send_welcome(call.message)
 
-# ========== НОВЫЙ КОД ДЛЯ ВЕБХУКОВ ==========
+# ========== КОД ДЛЯ ВЕБХУКОВ ==========
 
-# Устанавливаем вебхук при запуске
 def set_webhook():
     webhook_url = os.environ.get('RENDER_EXTERNAL_URL')
     if webhook_url:
@@ -288,7 +286,6 @@ def set_webhook():
     else:
         print("RENDER_EXTERNAL_URL не найден, проверьте настройки Render")
 
-# Обработка входящих запросов от Telegram
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -299,7 +296,6 @@ def webhook():
     else:
         return 'Bad request', 400
 
-# Проверка здоровья для Render (оба адреса)
 @app.route('/health')
 def health():
     return 'OK', 200
@@ -308,7 +304,6 @@ def health():
 def livez():
     return 'OK', 200
 
-# Запуск Flask-приложения
 if __name__ == '__main__':
     set_webhook()
     port = int(os.environ.get('PORT', 10000))
