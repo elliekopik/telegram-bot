@@ -2,6 +2,7 @@ import telebot
 from telebot import types
 from flask import Flask, request
 import os
+import urllib.parse
 
 bot = telebot.TeleBot('8444015997:AAG5fJECvwVJqbZmaehxr813VGFjWT9rvOA')
 app = Flask(__name__)
@@ -13,11 +14,10 @@ user_data = {}
 user_step = {}
 waiting_for_decision = {}
 
-# ========== ОСНОВНАЯ КОМАНДА СТАРТ (всегда работает) ==========
+# ========== ОСНОВНАЯ КОМАНДА СТАРТ ==========
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
-    # Полная очистка всех данных пользователя
     if chat_id in user_data:
         del user_data[chat_id]
     if chat_id in user_step:
@@ -137,7 +137,6 @@ def callback_country_start(call):
         show_country_menu(call.message)
 
 def get_custom_city(message):
-    # ПЕРВАЯ ПРОВЕРКА: команда /start
     if message.text == '/start':
         send_welcome(message)
         return
@@ -379,7 +378,19 @@ def confirm_yes(call):
 
     client_name = call.from_user.first_name or call.from_user.username or "Клиент"
     client_username = f"@{call.from_user.username}" if call.from_user.username else "нет username"
-
+    
+    # Кодируем текст для URL (русские буквы и пробелы)
+    prefill_text = "Здравствуйте! Предложение по Вашему запросу: "
+    encoded_text = urllib.parse.quote(prefill_text)
+    
+    # Формируем ссылку для предзаполнения сообщения
+    # Если есть username клиента — используем его, иначе сообщение можно отправить по ID, но ссылка с ID сложнее
+    if call.from_user.username:
+        deep_link = f"https://t.me/{call.from_user.username}?text={encoded_text}"
+    else:
+        # Альтернатива: ссылка для отправки сообщения по ID (работает только если у вас есть чат с пользователем)
+        deep_link = f"tg://resolve?domain={call.from_user.id}&text={encoded_text}"
+    
     agent_summary = (f"📋 НОВАЯ ЗАЯВКА!\n\n"
                      f"👤 Клиент: {client_name}\n"
                      f"📱 Username: {client_username}\n"
@@ -392,10 +403,10 @@ def confirm_yes(call):
                      f"👶 Детей: {data.get('kids_count', '0')}\n"
                      f"🧩 Возраст детей: {data.get('kids_age', '-')}\n"
                      f"💰 Бюджет до: {data['budget']} руб.\n\n"
-                     f"✅ Чтобы ответить клиенту, напишите ему: @{call.from_user.username if call.from_user.username else 'username отсутствует'}")
+                     f"✅ [Написать клиенту]({deep_link})")
 
     try:
-        bot.send_message(YOUR_TELEGRAM_ID, agent_summary)
+        bot.send_message(YOUR_TELEGRAM_ID, agent_summary, parse_mode='Markdown')
         bot.send_message(call.message.chat.id, "📨 Заявка отправлена турагенту!")
     except:
         bot.send_message(call.message.chat.id, "⚠️ Заявка сохранена, оператор свяжется с вами.")
