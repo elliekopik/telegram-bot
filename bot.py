@@ -379,17 +379,18 @@ def confirm_yes(call):
     client_name = call.from_user.first_name or call.from_user.username or "Клиент"
     client_username = f"@{call.from_user.username}" if call.from_user.username else "нет username"
     
-    # Кодируем текст для URL (русские буквы и пробелы)
+    # Текст, который будет копироваться
     prefill_text = "Здравствуйте! Предложение по Вашему запросу: "
+    
+    # Кодируем текст для передачи в callback_data
     encoded_text = urllib.parse.quote(prefill_text)
     
-    # Формируем ссылку для предзаполнения сообщения
-    # Если есть username клиента — используем его, иначе сообщение можно отправить по ID, но ссылка с ID сложнее
-    if call.from_user.username:
-        deep_link = f"https://t.me/{call.from_user.username}?text={encoded_text}"
-    else:
-        # Альтернатива: ссылка для отправки сообщения по ID (работает только если у вас есть чат с пользователем)
-        deep_link = f"tg://resolve?domain={call.from_user.id}&text={encoded_text}"
+    # Создаём кнопку для копирования
+    copy_knopka = types.InlineKeyboardMarkup()
+    copy_knopka.add(types.InlineKeyboardButton(
+        '📋 Скопировать ответ', 
+        callback_data=f'copy_answer_{encoded_text}'
+    ))
     
     agent_summary = (f"📋 НОВАЯ ЗАЯВКА!\n\n"
                      f"👤 Клиент: {client_name}\n"
@@ -403,10 +404,11 @@ def confirm_yes(call):
                      f"👶 Детей: {data.get('kids_count', '0')}\n"
                      f"🧩 Возраст детей: {data.get('kids_age', '-')}\n"
                      f"💰 Бюджет до: {data['budget']} руб.\n\n"
-                     f"✅ [Написать клиенту]({deep_link})")
+                     f"✅ Чтобы ответить клиенту, нажмите на его username: {client_username}\n\n"
+                     f"📝 Затем нажмите кнопку ниже, чтобы скопировать готовый ответ:")
 
     try:
-        bot.send_message(YOUR_TELEGRAM_ID, agent_summary, parse_mode='Markdown')
+        bot.send_message(YOUR_TELEGRAM_ID, agent_summary, reply_markup=copy_knopka)
         bot.send_message(call.message.chat.id, "📨 Заявка отправлена турагенту!")
     except:
         bot.send_message(call.message.chat.id, "⚠️ Заявка сохранена, оператор свяжется с вами.")
@@ -415,6 +417,16 @@ def confirm_yes(call):
         del user_data[call.message.chat.id]
     if call.message.chat.id in user_step:
         del user_step[call.message.chat.id]
+
+# Обработчик кнопки "Копировать ответ"
+@bot.callback_query_handler(func=lambda call: call.data.startswith('copy_answer_'))
+def copy_answer(call):
+    bot.answer_callback_query(call.id)
+    # Декодируем текст из callback_data
+    encoded_text = call.data.split('_', 2)[2]
+    text = urllib.parse.unquote(encoded_text)
+    # Отправляем сообщение с текстом (Telegram сам предложит скопировать при нажатии)
+    bot.send_message(call.message.chat.id, f"📋 Скопируйте этот текст:\n\n`{text}`", parse_mode='Markdown')
 
 @bot.callback_query_handler(func=lambda call: call.data == 'confirm_no')
 def confirm_no(call):
